@@ -1,0 +1,46 @@
+services:
+  db:
+    build: ./db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: home
+      MYSQL_USER: db
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    # No ports exposed directly – nginx is the only public entry point
+    environment:
+      DB_HOST: db
+      DB_NAME: home
+      DB_USER: db
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      API_KEY_TEMP_AND_HUM: ${API_KEY_TEMP_AND_HUM}
+      API_KEY_EVENT: ${API_KEY_EVENT}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx-sqlinsert:
+    build: ./nginx
+    ports:
+      - 127.0.0.1:1557:80
+    environment:
+      NGINX_AUTH_USER: ${NGINX_AUTH_USER}
+      NGINX_AUTH_PASSWORD: ${NGINX_AUTH_PASSWORD}
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  db_data:
