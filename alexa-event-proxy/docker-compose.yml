@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   api:
     build: ./api
@@ -8,7 +7,7 @@ services:
   nginx-alexa-proxy:
     build: ./nginx
     ports:
-      - 127.0.0.1:1557:80
+      - 127.0.0.1:1558:80
     environment:
       NGINX_AUTH_USER: ${NGINX_AUTH_USER}
       NGINX_AUTH_PASSWORD: ${NGINX_AUTH_PASSWORD}

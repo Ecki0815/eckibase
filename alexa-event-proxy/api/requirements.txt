@@ -1,4 +1,4 @@
-Flask==2.3.4
+Flask==2.3.3
 Flask-Sock==0.5.2
 gunicorn==21.2.0
-simple-websocket==0.4.1
+simple-websocket==1.1.0
