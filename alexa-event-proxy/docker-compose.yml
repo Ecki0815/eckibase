@@ -1,0 +1,17 @@
+version: "3.9"
+services:
+  api:
+    build: ./api
+    env_file: [.env]
+    restart: unless-stopped
+
+  nginx-alexa-proxy:
+    build: ./nginx
+    ports:
+      - 127.0.0.1:1557:80
+    environment:
+      NGINX_AUTH_USER: ${NGINX_AUTH_USER}
+      NGINX_AUTH_PASSWORD: ${NGINX_AUTH_PASSWORD}
+    depends_on:
+      - api
+    restart: unless-stopped
