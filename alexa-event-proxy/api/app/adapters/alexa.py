@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime, UTC
 from flask import jsonify, request
-from ..core import enqueue_event, auth
+from ..core import enqueue_event
 
 
 def get_alexa_devices():
@@ -58,9 +58,6 @@ def build_alexa_endpoint(device):
 def register_routes(app):
     @app.post("/api/v1/adapters/alexa")
     def alexa_adapter():
-        if not auth(request):
-            return jsonify({"error": "unauthorized"}), 401
-
         data = request.get_json(silent=True) or {}
         directive = data.get("directive") or {}
         header = directive.get("header") or {}

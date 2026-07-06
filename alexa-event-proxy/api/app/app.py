@@ -1,6 +1,6 @@
 import json
 from flask import jsonify, request
-from .core import app, auth, enqueue_event, clients, clients_lock, sock
+from .core import app, enqueue_event, clients, clients_lock, sock
 from .adapters import register_adapters
 
 register_adapters(app)
@@ -18,9 +18,6 @@ def event():
 
     Accepts arbitrary JSON events and sends them into the proxy event bus.
     """
-    if not auth(request):
-        return jsonify({"error": "unauthorized"}), 401
-
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({"error": "invalid_payload"}), 400
@@ -34,13 +31,6 @@ def event():
 @sock.route("/ws")
 def websocket_route(ws):
     """Websocket endpoint for subscribing to proxy event channels."""
-    if not auth(request):
-        try:
-            ws.close()
-        except Exception:
-            pass
-        return
-
     ch = request.args.get("channel", "default")
     with clients_lock:
         clients.setdefault(ch, set()).add(ws)

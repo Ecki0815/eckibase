@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_sock import Sock
 from queue import Queue
-import threading, json, os, uuid, hmac
+import threading, json, os, uuid
 from datetime import datetime, UTC
 
 app = Flask(__name__)
@@ -10,9 +10,6 @@ sock = Sock(app)
 clients = {}
 clients_lock = threading.Lock()
 queue = Queue(maxsize=1000)
-TOKEN = os.getenv("API_TOKEN")
-if not TOKEN:
-    raise RuntimeError("API_TOKEN environment variable must be set")
 
 
 def enqueue_event(source, channel, payload):
@@ -44,13 +41,6 @@ def dispatcher():
             with clients_lock:
                 for ws in dead:
                     clients.get(channel, set()).discard(ws)
-
-
-def auth(request):
-    """Validate the Bearer token from the Authorization header."""
-    auth_hdr = request.headers.get("Authorization", "")
-    expected = f"Bearer {TOKEN}"
-    return hmac.compare_digest(auth_hdr, expected)
 
 
 threading.Thread(target=dispatcher, daemon=True).start()

@@ -87,7 +87,8 @@ This project is already structured for the key use case you described:
 Set these environment variables in `.env`:
 
 ```dotenv
-API_TOKEN=change_me
+NGINX_AUTH_USER=proxyuser
+NGINX_AUTH_PASSWORD=change_me
 ALEXA_DEVICES=[{"endpointId":"switch.kitchen","friendlyName":"Kueche","entity_id":"switch.kitchen","device_type":"switch"}]
 HA_CHANNEL=homeassistant
 ```
@@ -95,7 +96,7 @@ HA_CHANNEL=homeassistant
 ### Example Alexa discovery request
 ```bash
 curl -X POST http://127.0.0.1:1558/api/v1/adapters/alexa \
-  -H "Authorization: Bearer <API_TOKEN>" \
+  -H "Authorization: Basic <base64-credentials>" \
   -H "Content-Type: application/json" \
   -d '{"directive":{"header":{"namespace":"Alexa.Discovery","name":"Discover","messageId":"1"}}}'
 ```
@@ -103,7 +104,7 @@ curl -X POST http://127.0.0.1:1558/api/v1/adapters/alexa \
 ### Example Alexa turn-on request
 ```bash
 curl -X POST http://127.0.0.1:1558/api/v1/adapters/alexa \
-  -H "Authorization: Bearer <API_TOKEN>" \
+  -H "Authorization: Basic <base64-credentials>" \
   -H "Content-Type: application/json" \
   -d '{"directive":{"header":{"namespace":"Alexa.PowerController","name":"TurnOn","messageId":"2"},"payload":{"endpoint":{"endpointId":"switch.kitchen"}}}}'
 ```
@@ -125,7 +126,7 @@ Normalizes incoming events by adding `id`, `timestamp`, `source`, and `channel`,
 Background worker that forwards queued events to all websocket clients subscribed to the event channel.
 
 ### `auth()`
-Validates the request by comparing the `Authorization: Bearer <API_TOKEN>` header against the configured token.
+No direct API token check is required; authentication is handled by Nginx Basic Auth upstream.
 
 ### `get_alexa_devices()`
 Loads Alexa device definitions from the `ALEXA_DEVICES` environment variable and creates a normalized device list for discovery.
@@ -150,7 +151,7 @@ Home Assistant can connect outbound to `wss://<proxy>/ws?channel=homeassistant` 
 
 This is the recommended setup when HA is running behind a private network and should not open ports to the internet.
 
-The HA websocket client should authenticate with `Authorization: Bearer <API_TOKEN>`.
+The HA websocket client should authenticate with Nginx using Basic Auth.
 
 Once connected, Home Assistant can act as both:
 - a consumer: receive proxy events on the `homeassistant` channel
@@ -194,7 +195,7 @@ Home Assistant-style event:
 ## Example usage
 ```bash
 curl -X POST http://127.0.0.1:1558/api/v1/event \
-  -H "Authorization: Bearer <API_TOKEN>" \
+  -H "Authorization: Basic <base64-credentials>" \
   -H "Content-Type: application/json" \
   -d '{"source":"homeassistant","channel":"homeassistant","payload":{"event_type":"state_changed","entity_id":"light.kitchen","state":"on"}}'
 ```
