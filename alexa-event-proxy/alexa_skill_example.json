@@ -1,0 +1,23 @@
+{
+  "manifest": {
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "locales": {
+        "de-DE": {
+          "name": "Alexa Event Proxy",
+          "summary": "Minimal Alexa Smart Home bridge",
+          "description": "A starter skill for connecting Alexa to Home Assistant via the event proxy."
+        }
+      }
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "https://your-domain.example.com/api/v1/alexa/skill"
+        }
+      }
+    },
+    "permissions": [],
+    "privacyAndCompliance": {}
+  }
+}

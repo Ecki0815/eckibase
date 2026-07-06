@@ -1,74 +1,46 @@
-from flask import Flask, request, jsonify
-from flask_sock import Sock
-from queue import Queue, Full
-import threading, json, os, uuid, hmac
-from datetime import datetime, UTC
+import json
+from flask import jsonify, request
+from .core import app, auth, enqueue_event, clients, clients_lock, sock
+from .adapters import register_adapters
 
-app = Flask(__name__)
-# limit request size to 1 MiB
-app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
-sock = Sock(app)
-clients = {}
-clients_lock = threading.Lock()
-# bounded queue to reduce DoS risk
-queue = Queue(maxsize=1000)
-TOKEN = os.getenv("API_TOKEN")
-if not TOKEN:
-    raise RuntimeError("API_TOKEN environment variable must be set")
+register_adapters(app)
 
-def dispatcher():
-    while True:
-        channel, payload = queue.get()
-        dead = []
-        with clients_lock:
-            receivers = list(clients.get(channel, set()))
-        for ws in receivers:
-            try:
-                ws.send(json.dumps(payload))
-            except Exception:
-                dead.append(ws)
-        if dead:
-            with clients_lock:
-                for ws in dead:
-                    clients.get(channel, set()).discard(ws)
-                    
-thread=threading.Thread(target=dispatcher,daemon=True).start()
-
-def auth():
-    auth_hdr = request.headers.get("Authorization", "")
-    expected = f"Bearer {TOKEN}"
-    return hmac.compare_digest(auth_hdr, expected)
 
 @app.get("/health")
 def health():
-    return {"status":"ok","clients":sum(len(v) for v in clients.values())}
+    """Health-check endpoint reporting uptime status and active websocket clients."""
+    return jsonify({"status": "ok", "clients": sum(len(v) for v in clients.values())})
+
 
 @app.post("/api/v1/event")
 def event():
-    if not auth():
-        return {"error":"unauthorized"},401
-    data = request.get_json(force=True)
+    """Generic event ingestion endpoint.
+
+    Accepts arbitrary JSON events and sends them into the proxy event bus.
+    """
+    if not auth(request):
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return {"error": "invalid_payload"}, 400
-    ch = data.pop("channel", "default")
-    data["id"] = str(uuid.uuid4())
-    data["timestamp"] = datetime.now(UTC).isoformat()
-    try:
-        queue.put_nowait((ch, data))
-    except Full:
-        return {"error": "server_busy"}, 429
-    return {"success": True}
+        return jsonify({"error": "invalid_payload"}), 400
+
+    source = data.pop("source", "generic")
+    channel = data.pop("channel", "default")
+    enqueue_event(source, channel, data)
+    return jsonify({"success": True, "channel": channel, "source": source})
+
 
 @sock.route("/ws")
-def ws(ws):
-    auth_hdr = request.headers.get("Authorization", "")
-    expected = f"Bearer {TOKEN}"
-    if not hmac.compare_digest(auth_hdr, expected):
+def websocket_route(ws):
+    """Websocket endpoint for subscribing to proxy event channels."""
+    if not auth(request):
         try:
             ws.close()
         except Exception:
             pass
         return
+
     ch = request.args.get("channel", "default")
     with clients_lock:
         clients.setdefault(ch, set()).add(ws)
@@ -79,6 +51,19 @@ def ws(ws):
                 break
             if msg == "ping":
                 ws.send("pong")
+                continue
+            try:
+                payload = json.loads(msg)
+            except Exception:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            source = payload.get("source", "ws")
+            channel = payload.get("channel", ch)
+            event_payload = payload.get("payload") or {}
+            if not isinstance(event_payload, dict):
+                continue
+            enqueue_event(source, channel, event_payload)
     finally:
         with clients_lock:
             clients.get(ch, set()).discard(ws)
