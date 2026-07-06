@@ -22,7 +22,7 @@ def enqueue_event(source, channel, payload):
         "timestamp": datetime.now(UTC).isoformat(),
         "source": source,
         "channel": channel,
-        **payload,
+        "payload": payload if isinstance(payload, dict) else {},
     }
     queue.put_nowait((channel, event_payload))
     return event_payload

@@ -1,6 +1,6 @@
 # Alexa Event Proxy
 
-This project is a generic event bridge for connecting different integrations such as Home Assistant, Alexa, Telegram, or custom services.
+This project is an event proxy for Alexa and Home Assistant workflows, with a generic event bus for custom adapters.
 
 ## Architecture
 
@@ -12,14 +12,7 @@ The core service is responsible for three things:
 2. Normalizing them into a simple internal event format.
 3. Broadcasting them to subscribed channels over HTTP/WebSocket.
 
-This means the proxy does not care whether the event came from:
-- Home Assistant
-- Alexa
-- Telegram
-- Discord
-- Slack
-- MQTT
-- a custom script or service
+This means the proxy can handle events from Home Assistant, Alexa, or other custom services.
 
 ### Suggested architecture
 The system is split into three layers:
@@ -34,9 +27,8 @@ The system is split into three layers:
 2. Adapter layer
    - Adapters translate provider-specific payloads into the generic event format.
    - Examples:
-     - Home Assistant adapter: translates Home Assistant-originated events into generic bridge events
      - Alexa adapter: converts Alexa directives into generic events and back into Alexa-compatible responses
-     - Telegram adapter: forwards Telegram bot messages into the same event bus
+     - custom services can publish to the proxy using the generic `/api/v1/event` endpoint
    - The adapter layer is intentionally separate so new integrations can be added without changing the core proxy.
    - In code, adapters live in `api/app/adapters/` and are registered by `api/app/app.py`.
 
@@ -46,7 +38,6 @@ The system is split into three layers:
      - a websocket client
      - a Home Assistant automation
      - an Alexa skill handler
-     - a Telegram bot
      - any other custom service
 
 ### Event shape
@@ -60,10 +51,10 @@ Every event is normalized into a common structure consisting of:
 This keeps the core simple and makes it easy to connect different systems with different message schemas.
 
 ### Why this design is useful
-This architecture makes the project reusable for more than one use case:
-- You can start with Alexa as one adapter.
-- Later you can connect Home Assistant or Telegram without changing the core event flow.
-- The proxy becomes a generic endpoint for automation and cross-platform messaging.
+This architecture makes the project reusable for the Alexa + Home Assistant use case while still supporting additional adapters later:
+- You can start with Alexa as the primary adapter.
+- Later you can connect Home Assistant or other services without changing the core event flow.
+- The proxy remains a generic endpoint for automation and local event delivery.
 
 ### Example flow
 1. A source sends an event to `/api/v1/event` or connects via websocket.
@@ -179,10 +170,10 @@ This keeps HA unexposed to the internet while still participating fully in the p
 Generic event:
 ```json
 {
-  "source": "telegram",
-  "channel": "telegram",
+  "source": "custom",
+  "channel": "homeassistant",
   "payload": {
-    "text": "Hello from Telegram"
+    "text": "Hello from a local integration"
   }
 }
 ```
